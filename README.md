@@ -18,7 +18,7 @@ dev.sh            runs Teddy's dev server with this study
 deploy.sh         builds, then copies the build to the web server
 ```
 
-The `teddy` submodule pins the version of Teddy this study runs. Teddy's README describes every setting in `config.js` and the columns each CSV needs.
+The `teddy` submodule pins the version of Teddy this study runs. Teddy's README describes [every setting in `config.js`](https://github.com/uwmadison-chm/teddy-static#configjs) and [the columns each CSV needs](https://github.com/uwmadison-chm/teddy-static#item-csvs).
 
 ## Getting started
 
@@ -54,7 +54,7 @@ This builds the study and copies `teddy/dist/` to the server with rsync. It copi
 
 It won't deploy a build with `debug: true`, since that build records nothing. `ALLOW_DEBUG=1 ./deploy.sh` deploys one anyway, for trying out a server.
 
-Serve it over HTTPS, since browsers only allow the camera on secure pages. Teddy's README covers the caching headers and the gzip and brotli copies.
+Serve it over HTTPS, since browsers only allow the camera on secure pages. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#production-build) covers the caching headers and the gzip and brotli copies.
 
 ## Linking from REDCap
 
@@ -64,7 +64,7 @@ A link carries the pig task's parameters, the modules to run, and where to go af
 https://teddy.example.edu/?participant_id=[record_id]&session=[event-name]&modules=videolog:01|sentence:00,01|reels:01,02&nextURL=https://redcap.example.edu/...
 ```
 
-Teddy passes every parameter to pig when the session starts. `modules` lists the activities in order, separated by `|`, each with its item IDs after a colon. Teddy's README has the details.
+Teddy passes every parameter to pig when the session starts. `modules` lists the activities in order, separated by `|`, each with its item IDs after a colon. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#linking-to-teddy) has the details.
 
 ## Updating Teddy
 
