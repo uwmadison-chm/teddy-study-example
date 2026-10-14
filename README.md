@@ -12,7 +12,6 @@ reels/
   reels.csv       reels for the reels module
   *.mp4           the reel videos (two test patterns here)
 pig-task.toml     this study's task entry for pig's configuration
-nginx/teddy.conf  an nginx site that serves the build
 teddy/            Teddy itself, as a git submodule
 build.sh          builds Teddy with this study into teddy/dist/
 dev.sh            runs Teddy's dev server with this study
@@ -55,7 +54,7 @@ This builds the study and copies `teddy/dist/` to the server with rsync. It copi
 
 It won't deploy a build with `debug: true`, since that build records nothing. `ALLOW_DEBUG=1 ./deploy.sh` deploys one anyway, for trying out a server.
 
-`nginx/teddy.conf` is a site for nginx that serves the build over HTTPS (browsers only allow the camera on secure pages), sends the build's gzip copies, and sets caching headers: `index.html` is checked on every load, and everything in `assets/` is cached for good. With the ngx_brotli module, `brotli_static on;` sends the brotli copies too.
+Teddy's README covers serving the build: HTTPS for the camera, the gzip and brotli copies, and caching headers.
 
 ## Linking from REDCap
 
