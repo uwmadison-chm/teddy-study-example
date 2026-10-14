@@ -54,7 +54,7 @@ This builds the study and copies `teddy/dist/` to the server with rsync. It copi
 
 It won't deploy a build with `debug: true`, since that build records nothing. `ALLOW_DEBUG=1 ./deploy.sh` deploys one anyway, for trying out a server.
 
-Teddy's README covers serving the build: HTTPS for the camera, the gzip and brotli copies, and caching headers.
+Serve it over HTTPS, since browsers only allow the camera on secure pages. Teddy's README covers the caching headers and the gzip and brotli copies.
 
 ## Linking from REDCap
 
