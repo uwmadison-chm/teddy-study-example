@@ -1,0 +1,3 @@
+[submodule "teddy"]
+	path = teddy
+	url = https://github.com/uwmadison-chm/teddy-static

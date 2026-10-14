@@ -1,0 +1,13 @@
+# This study's entry for pig's configuration file. Copy it into the pig.toml on
+# the pig server; the task code has to match taskCode in config.js.
+
+[task.teddy_example]
+parameters = ["participant_id", "session"]
+run_key = ["participant_id", "session"]
+open = true
+media = true
+# Teddy sends recordings in 5-second parts; at the default bitrates a part is
+# well under 1 MB. The web server in front of pig has to allow request bodies
+# at least this large.
+max_part_size = "8M"
+expires_after = "24h"
