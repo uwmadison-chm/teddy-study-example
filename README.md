@@ -54,6 +54,8 @@ This builds the study and copies `teddy/dist/` to the server with rsync. It copi
 
 It won't deploy a build with `debug: true`, since that build records nothing. `ALLOW_DEBUG=1 ./deploy.sh` deploys one anyway, for trying out a server.
 
+If a study deploys differently (another server, a staging copy, extra steps before or after), copy `deploy.sh` to something like `mystudy-deploy.sh` and change what you need there. Each study repository is its own copy, so there's no need to make one script cover every case.
+
 Serve it over HTTPS, since browsers only allow the camera on secure pages. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#production-build) covers the caching headers and the gzip and brotli copies.
 
 ## Linking from REDCap
