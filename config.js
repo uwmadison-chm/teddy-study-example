@@ -14,10 +14,10 @@ export default {
     // Each module this study uses, and the CSV of its items, relative to this
     // folder. Links can only name these modules.
     modules: {
-        sentence: "sentence.csv",
-        videolog: "videolog.csv",
-        reels: "reels/reels.csv",
-        questions: "questions.csv",
+        sentence: "stimuli/sentence.csv",
+        videolog: "stimuli/videolog.csv",
+        reels: "stimuli/reels.csv",
+        questions: "stimuli/questions.csv",
     },
     // How recordings are made. Leave any of these out to use the default shown.
     recording: {

@@ -6,12 +6,12 @@ An example study for [Teddy](https://github.com/uwmadison-chm/teddy-static): its
 
 ```
 config.js         Teddy's settings for this study
-sentence.csv      sentences for the sentence module
-videolog.csv      prompts for the videolog module
-questions.csv     questions for the questions module
-reels/
-  reels.csv       reels for the reels module
-  *.mp4           the reel videos (two test patterns here)
+stimuli/
+  sentence.csv    sentences for the sentence module
+  videolog.csv    prompts for the videolog module
+  questions.csv   questions for the questions module
+  reels.csv       reels for the reels module; its file column is relative to stimuli/
+  reels/*.mp4     the reel videos (two test patterns here)
 pig-task.toml     this study's task entry for pig's configuration
 teddy/            Teddy itself, as a git submodule
 build.sh          builds Teddy with this study into teddy/dist/
@@ -38,7 +38,7 @@ The scripts need Node and npm; `deploy.sh` also needs rsync and SSH access to th
 1. Make a new repository from this one (on GitHub, "Use this template", or clone it and push it somewhere new).
 2. Choose a task code for the study, lowercase, and set it as `taskCode` in `config.js` and in the `[task.…]` line of `pig-task.toml`. Task codes are unique across a pig server.
 3. Set `pigServer` and `nextUrlHosts` in `config.js`.
-4. Replace the CSVs and reels with the study's own, and list the modules it uses in `modules`. A module left out isn't in the build.
+4. Replace the CSVs and reels in `stimuli/` with the study's own, and list the modules it uses in `modules`. A module left out isn't in the build.
 5. Set the `parameters` and `run_key` in `pig-task.toml` to what the study's links carry, then add the entry to the pig server's configuration and run `pig check` there.
 6. Set the default `TARGET` in `deploy.sh` to the web server and directory.
 7. When everything works, set `debug: false`.
