@@ -1,0 +1,5 @@
+id,text,responses
+relaxed,"In the last few hours, how relaxed did you feel?","0, Not at all | 1, Slightly | 2, Somewhat | 3, Moderately | 4, Extremely"
+cheerful,"In the last few hours, how cheerful did you feel?","0, Not at all | 1, Slightly | 2, Somewhat | 3, Moderately | 4, Extremely"
+energy,"In the last few hours, how much energy did you have?","0, None | 1, Low | 2, Some | 3, Moderate | 4, High"
+clear,"In the last few hours, how clearly were you thinking?","0, Not at all | 1, Slightly | 2, Somewhat | 3, Moderately | 4, Extremely"
