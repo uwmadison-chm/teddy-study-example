@@ -8,6 +8,7 @@ An example study for [Teddy](https://github.com/uwmadison-chm/teddy-static): its
 config.js         Teddy's settings for this study
 sentence.csv      sentences for the sentence module
 videolog.csv      prompts for the videolog module
+questions.csv     questions for the questions module
 reels/
   reels.csv       reels for the reels module
   *.mp4           the reel videos (two test patterns here)
@@ -28,7 +29,7 @@ cd teddy-study-example
 ./dev.sh
 ```
 
-Then open http://localhost:9000/?modules=videolog:01|sentence:02|reels:01 to run a session. `debug` is on in `config.js`, so nothing is sent to pig and each event is logged to the browser console.
+Then open http://localhost:9000/?modules=videolog:01|sentence:02|reels:01|questions:relaxed,energy to run a session. `debug` is on in `config.js`, so nothing is sent to pig and each event is logged to the browser console.
 
 The scripts need Node and npm; `deploy.sh` also needs rsync and SSH access to the web server.
 
