@@ -83,3 +83,13 @@ git commit -am "Update Teddy"
 ```
 
 Changes to Teddy that one study needs belong in Teddy's repository, so every study can pick them up.
+
+## Randomization tables
+
+`scripts/make_randomization.py` turns a randomization schedule CSV (one row per participant per phase) into REDCap randomization tables: one CSV per phase, named for the phase, whose `redcap_randomization_number` and `redcap_randomization_group` are both the session's `modules` parameter. It also writes `stimulus_categories.csv` (type, id, and category for each reel and sentence) and `allocation_key.csv` (which schedule participant each row came from).
+
+```sh
+python3 scripts/make_randomization.py schedule.csv randomization/ --copies 2 --seed 1234
+```
+
+`--copies N` appends N copies of the participant list, each shuffled with a participant's phases kept together; `--seed` makes the shuffle repeatable. `--questions` sets the question IDs put first in every session, and `--sentences` how many of each row's sentences to use. Run it with `--help` for the defaults.
