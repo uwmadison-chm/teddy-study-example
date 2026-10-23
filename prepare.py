@@ -68,16 +68,26 @@ EXTENSIONS = {
 }
 
 
+# The kind of recording each module makes for its items. A recording of another
+# kind in that module gets its kind in the name too (reels_01_rating).
+MODULE_KINDS = {"sentences": "sentence", "videologs": "videolog", "questions": "questions", "reels": "reel"}
+
+
 def media_name(event_id, data):
-    """A recording's file name, without the extension: rec03-sentence-02 from
-    its recording number, kind, and item. The questions module records every
-    question at once, so its recordings have no item in the name."""
-    if data.get("type") != "recording" or data.get("recording") is None:
-        return f"media-{event_id}"
-    parts = [f"rec{data['recording']:02d}", data.get("kind")]
+    """A recording's file name, without the extension: the module and item, as
+    in sentences_07. The questions module records every question at once, so
+    its recording is just questions; calibration's are calibration_face_check
+    and calibration_eyes_closed."""
+    if data.get("type") != "recording" or data.get("module") is None:
+        return f"media_{event_id}"
+    module, kind = data["module"], data.get("kind")
+    own = MODULE_KINDS.get(module)
+    parts = [module]
     if data.get("item") is not None:
         parts.append(data["item"])
-    return "-".join(safe(str(p)) for p in parts if p is not None)
+    if kind is not None and kind != own:
+        parts.append(kind.removeprefix(f"{own}_") if own else kind)
+    return "_".join(safe(str(p)) for p in parts)
 
 
 def safe(text):
@@ -203,7 +213,7 @@ def join_media(run_dir, out_dir, out_root, manifest, rows, force, problem):
     seeks, and notes the file on the item's row."""
     by_id = {event_id: (data, row) for event_id, data, row in rows}
     used = set()
-    for item in manifest.get("media", []):
+    for item in sorted(manifest.get("media", []), key=lambda m: event_order(str(m["event_id"]))):
         event_id = str(item["event_id"])
         where = f"{run_dir} media {event_id}"
         if event_id not in by_id:
@@ -220,9 +230,13 @@ def join_media(run_dir, out_dir, out_root, manifest, rows, force, problem):
         if numbers != list(range(1, len(parts) + 1)) or (item["finished"] and len(parts) != item.get("parts")):
             problem(where, f"has parts {numbers}, but the manifest lists {item.get('parts')}; joined what's there")
 
-        name = media_name(event_id, data)
-        if name in used:
-            name = f"{name}-{event_id}"
+        # An item recorded again in the same run (after the camera help screen,
+        # say) gets _take2, _take3, in the order they were recorded.
+        base = name = media_name(event_id, data)
+        take = 1
+        while name in used:
+            take += 1
+            name = f"{base}_take{take}"
         used.add(name)
         target = out_dir / (name + extension(data.get("content_type")))
         row["media_file"] = target.relative_to(out_root).as_posix()

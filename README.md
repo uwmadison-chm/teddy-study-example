@@ -87,7 +87,7 @@ For each run, at the same path under `prepared/`, it writes `events.csv` and one
 - `recording_ms`: for an event during a recording, how far into that recording's video it happened.
 - On each `recording` row, `media_file` (the joined file, relative to the CSV), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.
 
-Recordings are named for their number, kind, and item, like `rec03-sentence-02.webm`, with the extension from the browser's content type (`.webm` from most browsers, `.mp4` from Safari).
+Recordings are named for their module and item, like `sentences_07.webm`. A reel's rating is `reels_01_rating`, calibration's are `calibration_face_check` and `calibration_eyes_closed`, and the questions module's one recording is `questions`. An item recorded twice in a run (after the camera help screen, say) gets `_take2`. The extension comes from the browser's content type (`.webm` from most browsers, `.mp4` from Safari).
 
 It reports anything it couldn't handle (a run whose event schema it doesn't know, a recording ffmpeg can't read, parts missing) and exits with an error, so a scheduled job notices. [Teddy's docs/events.md](https://github.com/uwmadison-chm/teddy-static/blob/main/docs/events.md) describes every event and field.
 
