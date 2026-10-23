@@ -17,6 +17,7 @@ teddy/            Teddy itself, as a git submodule
 build.sh          builds Teddy with this study into teddy/dist/
 dev.sh            runs Teddy's dev server with this study
 deploy.sh         builds, then copies the build to the web server
+prepare.py        turns organized pig data into CSVs and playable recordings
 ```
 
 The `teddy` submodule pins the version of Teddy this study runs. Teddy's README describes [every setting in `config.js`](https://github.com/uwmadison-chm/teddy-static#configjs) and [the columns each CSV needs](https://github.com/uwmadison-chm/teddy-static#item-csvs).
@@ -68,6 +69,29 @@ https://teddy.example.edu/?participant_id=[record_id]&session=[event-name]&modul
 ```
 
 Teddy passes every parameter to pig when the session starts. `modules` lists the activities in order, separated by `|`, each with its item IDs after a colon. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#linking-to-teddy) has the details.
+
+## Preparing the data
+
+Pig stores what Teddy sends as it arrives: events as JSON lines, recordings in numbered parts. `pig organize`, on the machine where the data ends up, copies each finished run into a tree by task, participant, and session. `prepare.py` takes it from there:
+
+```sh
+python3 prepare.py /secure/pig/organized/teddy_example prepared
+```
+
+For each run, at the same path under `prepared/`, it writes `events.csv` and one playable file per recording. `prepared/events.csv` has every run's rows together. It needs Python 3 and ffmpeg, and never changes the organized tree. Running it again rewrites the CSVs and joins only the recordings that aren't there yet; `--force` joins them all again.
+
+`events.csv` has one row per event, in the order Teddy made them, with repeats dropped:
+
+- The run's `task_code`, `run_number`, `run_id`, and `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), and its link parameters, on every row. A parameter that has the same name as an event field gets a `param.` prefix, like `param.module`.
+- Then each event's fields. Nested ones are flattened into dotted columns (`study.hash`, `_client.wall_time`); lists stay in one cell, as JSON (`choices`, `items`). An event without a field leaves its cell empty.
+- `recording_ms`: for an event during a recording, how far into that recording's video it happened.
+- On each `recording` row, `media_file` (the joined file, relative to the CSV), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.
+
+Recordings are named for their number, kind, and item, like `rec03-sentence-02.webm`, with the extension from the browser's content type (`.webm` from most browsers, `.mp4` from Safari).
+
+It reports anything it couldn't handle (a run whose event schema it doesn't know, a recording ffmpeg can't read, parts missing) and exits with an error, so a scheduled job notices. [Teddy's docs/events.md](https://github.com/uwmadison-chm/teddy-static/blob/main/docs/events.md) describes every event and field.
+
+It's an example: copy it with the rest of this repository and change it to suit the study's analysis.
 
 ## Updating Teddy
 
