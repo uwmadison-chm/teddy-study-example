@@ -78,13 +78,28 @@ Pig stores what Teddy sends as it arrives: events as JSON lines, recordings in n
 python3 prepare.py /secure/pig/organized/teddy_example prepared
 ```
 
-For each run, at the same path under `prepared/`, it writes `events.csv` and one playable file per recording. `prepared/events.csv` has every run's rows together. It needs Python 3 and ffmpeg, and never changes the organized tree.
+The first argument can be a whole organized tree, any directory in it, or one run's directory. Each run goes in a directory named for its run key, the `participant_id` and `session` in `pig-task.toml`:
 
-It's meant to run after each `pig organize`, as runs come in. A run is prepared once: its `events.csv` is written last, and a run that has one is skipped next time, without reading its events or touching its recordings. Finding runs lists directories but never goes inside a run's, so the media parts aren't scanned. `prepared/events.csv` is rebuilt from the runs' own CSVs when there's a new run; at thousands of runs it's the slow part, and `--no-combined` skips it. `--force` prepares every run again.
+```
+prepared/
+    sessions.csv               one row per prepared run
+    events.csv                 every run's events together
+    10351/baseline/            the participant's first baseline run
+        events.csv
+        sentences_07.webm
+        ...
+    10351/baseline_0002/       their second, if they started the link again
+```
+
+It needs Python 3 and ffmpeg, and never changes the organized tree.
+
+`sessions.csv` is the place to start an analysis. Each row has the run key, `run_number`, `path`, `run_id`, `task_code`, `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), `started_at`, how many events and recordings it has, how many recordings were cut short, how many problems preparing it reported, and when it was prepared.
+
+It's meant to run after each `pig organize`, as runs come in. A run is prepared once: a run listed in `sessions.csv` is skipped next time, without reading its events or touching its recordings. Finding runs lists directories but never goes inside a run's, so the media parts aren't scanned; with 9,000 runs, a pass with nothing new takes about a second. `prepared/events.csv` is rebuilt from the runs' own CSVs when there's a new run; at thousands of runs it's the slow part, and `--no-combined` skips it. `--force` prepares every run again. Two runs that would land in the same directory (two tasks with the same participant and session, say) are reported, and the second isn't prepared.
 
 `events.csv` has one row per event, in the order Teddy made them, with repeats dropped:
 
-- The run's `task_code`, `run_number`, `run_id`, and `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), and its link parameters, on every row. A parameter that has the same name as one of Teddy's event fields gets a `param.` prefix, like `param.module`. The field names are a fixed list, `EVENT_FIELDS` in the script, so a parameter's column doesn't change as runs are added.
+- The run's `task_code`, `run_number`, `run_id`, and `disposition`, and its link parameters, on every row. A parameter that has the same name as one of Teddy's event fields gets a `param.` prefix, like `param.module`. The field names are a fixed list, `EVENT_FIELDS` in the script, so a parameter's column doesn't change as runs are added.
 - Then each event's fields. Nested ones are flattened into dotted columns (`study.hash`, `_client.wall_time`); lists stay in one cell, as JSON (`choices`, `items`). An event without a field leaves its cell empty.
 - `recording_ms`: for an event during a recording, how far into that recording's video it happened.
 - On each `recording` row, `media_file` (the joined file, relative to the CSV it's in), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.

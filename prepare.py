@@ -3,19 +3,21 @@
 
     python3 prepare.py ORGANIZED PREPARED
 
-For each run under ORGANIZED (anything with a manifest.json), it writes, at the
-same path under PREPARED:
+ORGANIZED can be a whole tree, any directory in one, or a single run's
+directory (one with a manifest.json). For each run, it writes to
+PREPARED/<participant_id>/<session>/ (a directory per value in the task's
+run_key, with _0002 and so on after the last for a second run):
 
 - events.csv: one row per event, with the run's manifest fields and link
   parameters on every row, and nested fields flattened into dotted columns
 - one playable file per recording, its parts joined and remuxed with ffmpeg
 
-and PREPARED/events.csv, every run's rows in one file.
+It also keeps PREPARED/sessions.csv, one row per prepared run, and
+PREPARED/events.csv, every run's rows in one file.
 
-It never changes ORGANIZED. A run is prepared once: running it again prepares
-only the runs that don't have an events.csv in PREPARED yet (all of them, with
---force), then, if there were any, rebuilds PREPARED/events.csv from every
-run's events.csv.
+It never changes ORGANIZED. A run is prepared once: a run listed in
+sessions.csv is skipped next time (unless --force), and PREPARED/events.csv is
+rebuilt only when a run was added.
 
 This is a starting point. Copy it into your study and change what you need;
 the parts most likely to change are near the top. See Teddy's docs/events.md
@@ -31,6 +33,7 @@ import re
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # The event schema major version this script understands. A run whose
@@ -138,14 +141,21 @@ class Problems:
 # ---------------------------------------------------------------- reading runs
 
 
-def read_run(run_dir, problem):
-    """A run's manifest and its events, each event's data flattened, in event ID
-    order with repeats dropped. None if the run can't be used."""
-    manifest = json.loads((run_dir / "manifest.json").read_text())
+def read_manifest(run_dir, problem):
+    try:
+        manifest = json.loads((run_dir / "manifest.json").read_text())
+    except (OSError, ValueError) as e:
+        problem(run_dir, f"couldn't read manifest.json ({e}); skipped")
+        return None
     if manifest.get("type") != "pig_run_manifest":
         problem(run_dir, "manifest.json isn't a pig run manifest; skipped")
         return None
+    return manifest
 
+
+def read_events(run_dir, problem):
+    """A run's events, each event's data flattened, in event ID order with
+    repeats dropped. None if the run can't be used."""
     events = {}
     with open(run_dir / "events.jsonl", encoding="utf-8") as f:
         for number, line in enumerate(f, 1):
@@ -181,7 +191,7 @@ def read_run(run_dir, problem):
         except ValueError as e:
             problem(run_dir, f"event {event_id}: {e}")
         rows.append((event_id, data, row))
-    return manifest, rows
+    return rows
 
 
 def event_order(event_id):
@@ -313,9 +323,10 @@ def duration(path):
 
 
 def find_runs(organized):
-    """Every run directory under ORGANIZED, in order. A run's directory is the
-    one with a manifest.json, and nothing below it is a run, so the walk never
-    goes inside one: it lists directories, not every media part."""
+    """Every run directory under ORGANIZED, in order, or ORGANIZED itself if
+    it's a run. A run's directory is the one with a manifest.json, and nothing
+    below it is a run, so the walk never goes inside one: it lists
+    directories, not every media part."""
     runs = []
     for directory, subdirectories, files in os.walk(organized):
         if "manifest.json" in files:
@@ -324,6 +335,69 @@ def find_runs(organized):
         else:
             subdirectories.sort()
     return sorted(runs)
+
+
+def run_path(manifest):
+    """Where a run goes in PREPARED: a directory per run-key value, like
+    10351/baseline. A participant's second run of a session is
+    10351/baseline_0002."""
+    names = manifest.get("run_key") or []
+    if not names:
+        raise ValueError("the task has no run_key, so there's nothing to name its directory by")
+    values = [manifest.get("parameters", {}).get(n) for n in names]
+    for name, value in zip(names, values):
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+            raise ValueError(f"its {name}, {value!r}, can't be a directory name")
+    if manifest["run_number"] > 1:
+        values[-1] = f"{values[-1]}_{manifest['run_number']:04d}"
+    return Path(*values)
+
+
+# ---------------------------------------------------------------- the index
+
+# PREPARED/sessions.csv lists every run that's been prepared, one row each. It's
+# how the script knows a run is done, and it's the place to start an analysis:
+# filter on disposition, or on problems, then follow path.
+INDEX_FILE = "sessions.csv"
+
+
+def read_index(path):
+    if not path.exists():
+        return {}
+    with open(path, newline="", encoding="utf-8") as f:
+        return {row["run_id"]: row for row in csv.DictReader(f)}
+
+
+def index_row(manifest, path, rows, problems):
+    media = manifest.get("media", [])
+    key = {column_for(n): manifest["parameters"].get(n) for n in manifest["run_key"]}
+    return {
+        **key,
+        "run_number": manifest["run_number"],
+        "path": path.as_posix(),
+        "run_id": manifest["run_id"],
+        "task_code": manifest["task_code"],
+        "disposition": manifest["disposition"],
+        "started_at": manifest.get("started_at"),
+        "events": len(rows),
+        "recordings": len(media),
+        "unfinished_recordings": sum(1 for m in media if not m["finished"]),
+        "problems": problems,
+        "prepared_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+
+
+def write_index(path, index):
+    columns = []
+    for row in index.values():
+        columns += [c for c in row if c not in columns]
+    def order(row):
+        # By the run key's values (the columns before run_number), then run number.
+        key = list(row.values())[: list(row).index("run_number")]
+        return key, int(row["run_number"])
+
+    ordered = sorted(index.values(), key=order)
+    write_csv(path, columns, ordered)
 
 
 # ---------------------------------------------------------------- writing CSVs
@@ -402,7 +476,7 @@ def write_csv(path, columns, rows):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("organized", type=Path, help="a pig organize tree, or any directory in one")
+    parser.add_argument("organized", type=Path, help="a pig organize tree, any directory in one, or one run's directory")
     parser.add_argument("prepared", type=Path, help="where to write the CSVs and recordings")
     parser.add_argument("--force", action="store_true", help="prepare every run again, even ones already in PREPARED")
     parser.add_argument("--no-combined", action="store_true", help="don't rebuild PREPARED/events.csv")
@@ -417,30 +491,51 @@ def main():
         sys.exit("PREPARED has to be outside ORGANIZED, and the other way round.")
 
     problem = Problems()
+    index_path = prepared / INDEX_FILE
+    index = read_index(index_path)
+    taken = {row["path"]: run_id for run_id, row in index.items()}
     run_dirs = find_runs(organized)
-    out_dirs = []
     done = 0
-    for run_dir in run_dirs:
-        out_dir = prepared / run_dir.relative_to(organized)
-        out_dirs.append(out_dir)
-        if not args.force and (out_dir / "events.csv").exists():
-            continue
-        read = read_run(run_dir, problem)
-        if read is None:
-            continue
-        manifest, rows = read
-        out_dir.mkdir(parents=True, exist_ok=True)
-        add_timing(rows)
-        join_media(run_dir, out_dir, manifest, rows, args.force, problem)
-        write_run_csv(out_dir / "events.csv", manifest, rows, problem)
-        done += 1
+    try:
+        for run_dir in run_dirs:
+            manifest = read_manifest(run_dir, problem)
+            if manifest is None:
+                continue
+            run_id = manifest["run_id"]
+            try:
+                path = run_path(manifest)
+            except ValueError as e:
+                problem(run_dir, f"{e}; skipped")
+                continue
+            if taken.get(path.as_posix(), run_id) != run_id:
+                problem(run_dir, f"run {run_id} would go in {path}, which already holds run {taken[path.as_posix()]}; skipped")
+                continue
+            out_dir = prepared / path
+            if not args.force and run_id in index and (out_dir / "events.csv").exists():
+                continue
 
-    print(f"Prepared {done} new run(s) of {len(run_dirs)} into {prepared}.")
+            before = problem.count
+            rows = read_events(run_dir, problem)
+            if rows is None:
+                continue
+            out_dir.mkdir(parents=True, exist_ok=True)
+            add_timing(rows)
+            join_media(run_dir, out_dir, manifest, rows, args.force, problem)
+            write_run_csv(out_dir / "events.csv", manifest, rows, problem)
+            index[run_id] = index_row(manifest, path, rows, problem.count - before)
+            taken[path.as_posix()] = run_id
+            done += 1
+    finally:
+        # Whatever got done is recorded, even if something stopped the script.
+        if done:
+            write_index(index_path, index)
+
+    print(f"Prepared {done} new run(s); {len(index)} in {index_path}.")
     # Rebuilt only when it's missing or a run was added, since at thousands of
     # runs it's the slowest part of a run with nothing new.
     combined = prepared / "events.csv"
     if not args.no_combined and (done or not combined.exists()):
-        count = write_combined(combined, prepared, out_dirs)
+        count = write_combined(combined, prepared, [prepared / row["path"] for row in sorted(index.values(), key=lambda r: r["path"])])
         print(f"Wrote {combined}, with {count} run(s).")
     if problem.count:
         sys.exit(f"{problem.count} problem(s); see above.")
