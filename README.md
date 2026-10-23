@@ -7,7 +7,7 @@ An example study for [Teddy](https://github.com/uwmadison-chm/teddy-static): its
 ```
 config.js         Teddy's settings for this study
 stimuli/
-  sentence.csv    sentences for the sentence module
+  sentences.csv   sentences for the sentences module
   videolog.csv    prompts for the videolog module
   questions.csv   questions for the questions module
   reels.csv       reels for the reels module; its file column is relative to stimuli/
@@ -29,7 +29,7 @@ cd teddy-study-example
 ./dev.sh
 ```
 
-Then open http://localhost:9000/?modules=videolog:01|sentence:02|reels:01|questions:relaxed,energy to run a session. `debug` is on in `config.js`, so nothing is sent to pig and each event is logged to the browser console.
+Then open http://localhost:9000/?modules=videolog:01|sentences:02|reels:01|questions:relaxed,energy to run a session. `debug` is on in `config.js`, so nothing is sent to pig and each event is logged to the browser console.
 
 The scripts need Node and npm; `deploy.sh` also needs rsync and SSH access to the web server.
 
@@ -64,7 +64,7 @@ Serve it over HTTPS, since browsers only allow the camera on secure pages. [Tedd
 A link carries the pig task's parameters, the modules to run, and where to go afterwards:
 
 ```
-https://teddy.example.edu/?participant_id=[record_id]&session=[event-name]&modules=videolog:01|sentence:00,01|reels:01,02&nextURL=https://redcap.example.edu/...
+https://teddy.example.edu/?participant_id=[record_id]&session=[event-name]&modules=videolog:01|sentences:00,01|reels:01,02&nextURL=https://redcap.example.edu/...
 ```
 
 Teddy passes every parameter to pig when the session starts. `modules` lists the activities in order, separated by `|`, each with its item IDs after a colon. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#linking-to-teddy) has the details.
