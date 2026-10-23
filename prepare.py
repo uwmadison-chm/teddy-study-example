@@ -5,8 +5,8 @@
 
 ORGANIZED can be a whole tree, any directory in one, or a single run's
 directory (one with a manifest.json). For each run, it writes to
-PREPARED/<participant_id>/<session>/ (a directory per value in the task's
-run_key, with _0002 and so on after the last for a second run):
+PREPARED/<task_code>/<participant_id>/<session>/ (a directory per value in the
+task's run_key, with _0002 and so on after the last for a second run):
 
 - events.csv: one row per event, with the run's manifest fields and link
   parameters on every row, and nested fields flattened into dotted columns
@@ -338,9 +338,9 @@ def find_runs(organized):
 
 
 def run_path(manifest):
-    """Where a run goes in PREPARED: a directory per run-key value, like
-    10351/baseline. A participant's second run of a session is
-    10351/baseline_0002."""
+    """Where a run goes in PREPARED: its task code, then a directory per
+    run-key value, like teddy_example/10351/baseline. A participant's second
+    run of a session is teddy_example/10351/baseline_0002."""
     names = manifest.get("run_key") or []
     if not names:
         raise ValueError("the task has no run_key, so there's nothing to name its directory by")
@@ -350,7 +350,7 @@ def run_path(manifest):
             raise ValueError(f"its {name}, {value!r}, can't be a directory name")
     if manifest["run_number"] > 1:
         values[-1] = f"{values[-1]}_{manifest['run_number']:04d}"
-    return Path(*values)
+    return Path(manifest["task_code"], *values)
 
 
 # ---------------------------------------------------------------- the index
@@ -372,11 +372,11 @@ def index_row(manifest, path, rows, problems):
     media = manifest.get("media", [])
     key = {column_for(n): manifest["parameters"].get(n) for n in manifest["run_key"]}
     return {
+        "task_code": manifest["task_code"],
         **key,
         "run_number": manifest["run_number"],
         "path": path.as_posix(),
         "run_id": manifest["run_id"],
-        "task_code": manifest["task_code"],
         "disposition": manifest["disposition"],
         "started_at": manifest.get("started_at"),
         "events": len(rows),
@@ -392,7 +392,8 @@ def write_index(path, index):
     for row in index.values():
         columns += [c for c in row if c not in columns]
     def order(row):
-        # By the run key's values (the columns before run_number), then run number.
+        # By task code and the run key's values (the columns before
+        # run_number), then run number.
         key = list(row.values())[: list(row).index("run_number")]
         return key, int(row["run_number"])
 

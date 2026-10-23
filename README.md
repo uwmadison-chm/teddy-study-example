@@ -78,24 +78,24 @@ Pig stores what Teddy sends as it arrives: events as JSON lines, recordings in n
 python3 prepare.py /secure/pig/organized/teddy_example prepared
 ```
 
-The first argument can be a whole organized tree, any directory in it, or one run's directory. Each run goes in a directory named for its run key, the `participant_id` and `session` in `pig-task.toml`:
+The first argument can be a whole organized tree, any directory in it, or one run's directory. Each run goes in a directory named for its task code and run key, the `participant_id` and `session` in `pig-task.toml`:
 
 ```
 prepared/
     sessions.csv               one row per prepared run
     events.csv                 every run's events together
-    10351/baseline/            the participant's first baseline run
+    teddy_example/10351/baseline/         the participant's first baseline run
         events.csv
         sentences_07.webm
         ...
-    10351/baseline_0002/       their second, if they started the link again
+    teddy_example/10351/baseline_0002/    their second, if they started the link again
 ```
 
 It needs Python 3 and ffmpeg, and never changes the organized tree.
 
-`sessions.csv` is the place to start an analysis. Each row has the run key, `run_number`, `path`, `run_id`, `task_code`, `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), `started_at`, how many events and recordings it has, how many recordings were cut short, how many problems preparing it reported, and when it was prepared.
+`sessions.csv` is the place to start an analysis. Each row has `task_code`, the run key, `run_number`, `path`, `run_id`, `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), `started_at`, how many events and recordings it has, how many recordings were cut short, how many problems preparing it reported, and when it was prepared.
 
-It's meant to run after each `pig organize`, as runs come in. A run is prepared once: a run listed in `sessions.csv` is skipped next time, without reading its events or touching its recordings. Finding runs lists directories but never goes inside a run's, so the media parts aren't scanned; with 9,000 runs, a pass with nothing new takes about a second. `prepared/events.csv` is rebuilt from the runs' own CSVs when there's a new run; at thousands of runs it's the slow part, and `--no-combined` skips it. `--force` prepares every run again. Two runs that would land in the same directory (two tasks with the same participant and session, say) are reported, and the second isn't prepared.
+It's meant to run after each `pig organize`, as runs come in. A run is prepared once: a run listed in `sessions.csv` is skipped next time, without reading its events or touching its recordings. Finding runs lists directories but never goes inside a run's, so the media parts aren't scanned; with 9,000 runs, a pass with nothing new takes about a second. `prepared/events.csv` is rebuilt from the runs' own CSVs when there's a new run; at thousands of runs it's the slow part, and `--no-combined` skips it. `--force` prepares every run again. Two runs that would land in the same directory are reported, and the second isn't prepared; pig's run numbers should make that impossible.
 
 `events.csv` has one row per event, in the order Teddy made them, with repeats dropped:
 
