@@ -78,14 +78,16 @@ Pig stores what Teddy sends as it arrives: events as JSON lines, recordings in n
 python3 prepare.py /secure/pig/organized/teddy_example prepared
 ```
 
-For each run, at the same path under `prepared/`, it writes `events.csv` and one playable file per recording. `prepared/events.csv` has every run's rows together. It needs Python 3 and ffmpeg, and never changes the organized tree. Running it again rewrites the CSVs and joins only the recordings that aren't there yet; `--force` joins them all again.
+For each run, at the same path under `prepared/`, it writes `events.csv` and one playable file per recording. `prepared/events.csv` has every run's rows together. It needs Python 3 and ffmpeg, and never changes the organized tree.
+
+It's meant to run after each `pig organize`, as runs come in. A run is prepared once: its `events.csv` is written last, and a run that has one is skipped next time, without reading its events or touching its recordings. Finding runs lists directories but never goes inside a run's, so the media parts aren't scanned. `prepared/events.csv` is rebuilt from the runs' own CSVs when there's a new run; at thousands of runs it's the slow part, and `--no-combined` skips it. `--force` prepares every run again.
 
 `events.csv` has one row per event, in the order Teddy made them, with repeats dropped:
 
-- The run's `task_code`, `run_number`, `run_id`, and `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), and its link parameters, on every row. A parameter that has the same name as an event field gets a `param.` prefix, like `param.module`.
+- The run's `task_code`, `run_number`, `run_id`, and `disposition` (`complete`, or `expired` if pig closed the run before Teddy finished it), and its link parameters, on every row. A parameter that has the same name as one of Teddy's event fields gets a `param.` prefix, like `param.module`. The field names are a fixed list, `EVENT_FIELDS` in the script, so a parameter's column doesn't change as runs are added.
 - Then each event's fields. Nested ones are flattened into dotted columns (`study.hash`, `_client.wall_time`); lists stay in one cell, as JSON (`choices`, `items`). An event without a field leaves its cell empty.
 - `recording_ms`: for an event during a recording, how far into that recording's video it happened.
-- On each `recording` row, `media_file` (the joined file, relative to the CSV), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.
+- On each `recording` row, `media_file` (the joined file, relative to the CSV it's in), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.
 
 Recordings are named for their module and item, like `sentences_07.webm`. A reel's rating is `reels_01_rating`, calibration's are `calibration_face_check` and `calibration_eyes_closed`, and the questions module's one recording is `questions`. An item recorded twice in a run (after the camera help screen, say) gets `_take2`. The extension comes from the browser's content type (`.webm` from most browsers, `.mp4` from Safari).
 

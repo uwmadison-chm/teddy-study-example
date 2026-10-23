@@ -12,8 +12,10 @@ same path under PREPARED:
 
 and PREPARED/events.csv, every run's rows in one file.
 
-It never changes ORGANIZED. Running it again rewrites the CSVs and joins only
-the recordings that aren't in PREPARED yet (all of them, with --force).
+It never changes ORGANIZED. A run is prepared once: running it again prepares
+only the runs that don't have an events.csv in PREPARED yet (all of them, with
+--force), then, if there were any, rebuilds PREPARED/events.csv from every
+run's events.csv.
 
 This is a starting point. Copy it into your study and change what you need;
 the parts most likely to change are near the top. See Teddy's docs/events.md
@@ -24,6 +26,7 @@ import argparse
 import csv
 import json
 import mimetypes
+import os
 import re
 import shutil
 import subprocess
@@ -53,8 +56,25 @@ EVENT_COLUMNS = [
 ]
 
 # What a link parameter's column is called when an event field already has
-# its name.
+# its name (a link with ?module=...).
 PARAMETER_PREFIX = "param."
+
+# Every top-level field Teddy's events can have, from docs/events.md, and the
+# columns this script adds. A parameter with one of these names gets the
+# prefix. It's a fixed list, rather than the fields seen so far, so that a
+# parameter's column doesn't change name as more runs are prepared. Add to it
+# when Teddy's event schema gains a field.
+EVENT_FIELDS = {
+    "event_id", "recording_ms", "media_file", "media_finished", "media_duration_s",
+    "type", "level", "module", "recording", "_client",
+    "schema", "teddy", "study", "debug", "modules", "link_problems", "next_url",
+    "next_url_rejected", "expiration_time", "name", "message", "stack", "result",
+    "width", "height", "frame_rate", "constraint", "video_inputs", "audio_inputs",
+    "track", "items", "item", "best_score", "centered", "light_ok", "tips_shown",
+    "detector_errors", "text", "responses", "choices", "number", "of", "file",
+    "value", "label", "kind", "limit_seconds", "content_type", "reason", "line",
+    "lines", "animation",
+}
 
 # File extensions for the content types browsers record in. Anything else goes
 # to Python's mimetypes, then .bin.
@@ -208,7 +228,7 @@ def add_timing(rows):
             row["recording_ms"] = round(now - start, 3)
 
 
-def join_media(run_dir, out_dir, out_root, manifest, rows, force, problem):
+def join_media(run_dir, out_dir, manifest, rows, force, problem):
     """Joins each media item's parts into one file, remuxed so it plays and
     seeks, and notes the file on the item's row."""
     by_id = {event_id: (data, row) for event_id, data, row in rows}
@@ -239,7 +259,7 @@ def join_media(run_dir, out_dir, out_root, manifest, rows, force, problem):
             name = f"{base}_take{take}"
         used.add(name)
         target = out_dir / (name + extension(data.get("content_type")))
-        row["media_file"] = target.relative_to(out_root).as_posix()
+        row["media_file"] = target.name
 
         if force or not target.exists():
             if not item["finished"]:
@@ -289,33 +309,103 @@ def duration(path):
         return ""
 
 
+# ---------------------------------------------------------------- finding runs
+
+
+def find_runs(organized):
+    """Every run directory under ORGANIZED, in order. A run's directory is the
+    one with a manifest.json, and nothing below it is a run, so the walk never
+    goes inside one: it lists directories, not every media part."""
+    runs = []
+    for directory, subdirectories, files in os.walk(organized):
+        if "manifest.json" in files:
+            runs.append(Path(directory))
+            subdirectories.clear()
+        else:
+            subdirectories.sort()
+    return sorted(runs)
+
+
 # ---------------------------------------------------------------- writing CSVs
 
 
-def parameter_names(manifest):
+def parameters(manifest):
     """The run's link parameters, run key first, then the rest the task
-    declares, then any extras the link carried."""
-    parameters = manifest.get("parameters", {})
+    declares, then any extras the link carried, each under its column name."""
+    declared = manifest.get("parameters", {})
     extra = manifest.get("extra_parameters", {}) or {}
     names = list(manifest.get("run_key", []))
-    names += [n for n in parameters if n not in names]
+    names += [n for n in declared if n not in names]
     names += [n for n in extra if n not in names]
-    return names, {**extra, **parameters}
+    values = {**extra, **declared}
+    return {column_for(n): values.get(n) for n in names}
+
+
+def column_for(parameter):
+    if parameter in EVENT_FIELDS or parameter in RUN_COLUMNS:
+        return PARAMETER_PREFIX + parameter
+    return parameter
+
+
+def write_run_csv(path, manifest, rows, problem):
+    """The run's events.csv. It's written last, once its recordings are, and
+    appears all at once, since its being there is what says the run is done."""
+    run = {c: manifest.get(c) for c in RUN_COLUMNS}
+    params = parameters(manifest)
+    seen = {c for _, _, row in rows for c in row}
+    for column in params:
+        if column in seen:
+            problem(path.parent, f"the link parameter {column} is also an event field; add it to EVENT_FIELDS so it gets a {PARAMETER_PREFIX} prefix")
+    run.update(params)
+    columns = list(run) + list(EVENT_COLUMNS)
+    for _, _, row in rows:
+        columns += [c for c in row if c not in columns]
+    write_csv(path, columns, ({**run, **row} for _, _, row in rows))
+
+
+def write_combined(path, prepared, run_dirs):
+    """Every run's events.csv in one file, read back from the runs' own CSVs so
+    nothing has to be held in memory. Its columns are every run's columns:
+    manifest fields, then every parameter, then every event field, so a column
+    one run doesn't have is empty in its rows."""
+    csvs = [d / "events.csv" for d in run_dirs if (d / "events.csv").exists()]
+    params, fields = [], list(EVENT_COLUMNS)
+    for run_csv in csvs:
+        with open(run_csv, newline="", encoding="utf-8") as f:
+            header = next(csv.reader(f), [])
+        split = header.index("event_id") if "event_id" in header else len(header)
+        params += [c for c in header[len(RUN_COLUMNS):split] if c not in params]
+        fields += [c for c in header[split:] if c not in fields]
+
+    def rows():
+        for run_csv in csvs:
+            here = run_csv.parent.relative_to(prepared).as_posix()
+            with open(run_csv, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    if row.get("media_file"):
+                        row["media_file"] = f"{here}/{row['media_file']}"
+                    yield row
+
+    write_csv(path, RUN_COLUMNS + params + fields, rows())
+    return len(csvs)
 
 
 def write_csv(path, columns, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    scratch = path.with_name(path.name + ".partial")
+    with open(scratch, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=columns)
         writer.writeheader()
         writer.writerows(rows)
+    scratch.replace(path)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("organized", type=Path, help="a pig organize tree, or any directory in one")
     parser.add_argument("prepared", type=Path, help="where to write the CSVs and recordings")
-    parser.add_argument("--force", action="store_true", help="join every recording again, even ones already in PREPARED")
+    parser.add_argument("--force", action="store_true", help="prepare every run again, even ones already in PREPARED")
+    parser.add_argument("--no-combined", action="store_true", help="don't rebuild PREPARED/events.csv")
     args = parser.parse_args()
 
     for tool in ("ffmpeg", "ffprobe"):
@@ -327,55 +417,31 @@ def main():
         sys.exit("PREPARED has to be outside ORGANIZED, and the other way round.")
 
     problem = Problems()
-    runs = []
-    for manifest_path in sorted(organized.rglob("manifest.json")):
-        run_dir = manifest_path.parent
+    run_dirs = find_runs(organized)
+    out_dirs = []
+    done = 0
+    for run_dir in run_dirs:
+        out_dir = prepared / run_dir.relative_to(organized)
+        out_dirs.append(out_dir)
+        if not args.force and (out_dir / "events.csv").exists():
+            continue
         read = read_run(run_dir, problem)
         if read is None:
             continue
         manifest, rows = read
-        out_dir = prepared / run_dir.relative_to(organized)
         out_dir.mkdir(parents=True, exist_ok=True)
         add_timing(rows)
-        join_media(run_dir, out_dir, prepared, manifest, rows, args.force, problem)
-        runs.append((out_dir, manifest, rows))
+        join_media(run_dir, out_dir, manifest, rows, args.force, problem)
+        write_run_csv(out_dir / "events.csv", manifest, rows, problem)
+        done += 1
 
-    # Event columns from every run, so every CSV has the same columns.
-    event_columns = list(EVENT_COLUMNS)
-    for _, _, rows in runs:
-        for _, _, row in rows:
-            event_columns += [c for c in row if c not in event_columns]
-    run_columns = list(RUN_COLUMNS)
-    for _, manifest, _ in runs:
-        names, _ = parameter_names(manifest)
-        run_columns += [n for n in names if n not in run_columns]
-
-    # A parameter named like an event field (a link with ?module=...) gets a
-    # prefix. Deciding this across every run keeps the columns the same in all.
-    renamed = {n: PARAMETER_PREFIX + n for n in run_columns[len(RUN_COLUMNS):] if n in event_columns or n in RUN_COLUMNS}
-    for old, new in renamed.items():
-        print(f"The link parameter {old} is also an event field, so its column is {new}.", file=sys.stderr)
-    run_columns = RUN_COLUMNS + [renamed.get(n, n) for n in run_columns[len(RUN_COLUMNS):]]
-    columns = run_columns + event_columns
-
-    everything = []
-    for out_dir, manifest, rows in runs:
-        names, values = parameter_names(manifest)
-        run = {c: manifest.get(c) for c in RUN_COLUMNS}
-        run.update({renamed.get(n, n): values.get(n) for n in names})
-        here = out_dir.relative_to(prepared).as_posix() + "/"
-        combined, own = [], []
-        for _, _, row in rows:
-            combined.append({**run, **row})
-            local = dict(row)
-            if local.get("media_file", "").startswith(here):
-                local["media_file"] = local["media_file"][len(here):]
-            own.append({**run, **local})
-        write_csv(out_dir / "events.csv", columns, own)
-        everything += combined
-    write_csv(prepared / "events.csv", columns, everything)
-
-    print(f"Prepared {len(runs)} run(s) into {prepared}.")
+    print(f"Prepared {done} new run(s) of {len(run_dirs)} into {prepared}.")
+    # Rebuilt only when it's missing or a run was added, since at thousands of
+    # runs it's the slowest part of a run with nothing new.
+    combined = prepared / "events.csv"
+    if not args.no_combined and (done or not combined.exists()):
+        count = write_combined(combined, prepared, out_dirs)
+        print(f"Wrote {combined}, with {count} run(s).")
     if problem.count:
         sys.exit(f"{problem.count} problem(s); see above.")
 
