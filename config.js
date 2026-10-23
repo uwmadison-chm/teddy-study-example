@@ -15,7 +15,7 @@ export default {
     // folder. Links can only name these modules.
     modules: {
         sentences: "stimuli/sentences.csv",
-        videolog: "stimuli/videolog.csv",
+        videologs: "stimuli/videologs.csv",
         reels: "stimuli/reels.csv",
         questions: "stimuli/questions.csv",
     },
