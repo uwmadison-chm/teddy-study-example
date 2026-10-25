@@ -187,7 +187,7 @@ def read_events(run_dir, problem):
     for event_id, data in ordered:
         row = {"event_id": event_id}
         try:
-            flatten(data, "", row)
+            flatten(data, row)
         except ValueError as e:
             problem(run_dir, f"event {event_id}: {e}")
         rows.append((event_id, data, row))
@@ -199,17 +199,25 @@ def event_order(event_id):
     return (0, int(event_id), "") if event_id.isdigit() else (1, 0, event_id)
 
 
-def flatten(value, prefix, row):
-    """Nested objects become dotted columns: {"study": {"hash": ...}} is
-    study.hash. Lists stay whole, as JSON, since their length varies."""
-    for key, item in value.items():
-        name = f"{prefix}{key}"
-        if isinstance(item, dict) and item:
-            flatten(item, name + ".", row)
-            continue
-        if name in row:
-            raise ValueError(f"two fields flatten to {name}; kept the first")
-        row[name] = cell(item)
+def flatten(data, row):
+    """An event's fields as columns. A field that's an object of plain values
+    becomes dotted columns: {"study": {"hash": ...}} is study.hash. A list, or
+    an object with anything nested in it, stays whole in one cell, as JSON, so
+    a big nested field doesn't turn into dozens of sparse columns. pig's
+    client's `_client` is the exception: its plain values are always columns,
+    since every event's timing is in it."""
+    for key, value in data.items():
+        if isinstance(value, dict) and value and (key == "_client" or not any(isinstance(v, (dict, list)) for v in value.values())):
+            for inner, item in value.items():
+                put(row, f"{key}.{inner}", item)
+        else:
+            put(row, key, value)
+
+
+def put(row, name, value):
+    if name in row:
+        raise ValueError(f"two fields flatten to {name}; kept the first")
+    row[name] = cell(value)
 
 
 def cell(value):

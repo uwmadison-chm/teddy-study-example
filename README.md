@@ -100,7 +100,7 @@ It's meant to run after each `pig organize`, as runs come in. A run is prepared 
 `events.csv` has one row per event, in the order Teddy made them, with repeats dropped:
 
 - The run's `task_code`, `run_number`, `run_id`, and `disposition`, and its link parameters, on every row. A parameter that has the same name as one of Teddy's event fields gets a `param.` prefix, like `param.module`. The field names are a fixed list, `EVENT_FIELDS` in the script, so a parameter's column doesn't change as runs are added.
-- Then each event's fields. Nested ones are flattened into dotted columns (`study.hash`, `_client.wall_time`); lists stay in one cell, as JSON (`choices`, `items`). An event without a field leaves its cell empty.
+- Then each event's fields. A field that's an object of plain values is flattened into dotted columns (`study.hash`, `_client.wall_time`). A list, or an object with more nested inside, stays whole in one cell as JSON (`choices`, `items`, `_client.screen`), so a big nested field is one column, not dozens. An event without a field leaves its cell empty.
 - `recording_ms`: for an event during a recording, how far into that recording's video it happened.
 - On each `recording` row, `media_file` (the joined file, relative to the CSV it's in), `media_finished` (`false` when the tab closed mid-recording, so the file ends early), and `media_duration_s`.
 
