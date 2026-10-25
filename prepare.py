@@ -36,9 +36,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# The event schema major version this script understands. A run whose
-# session_started says another major version is skipped; see docs/events.md.
-SCHEMA_MAJOR = "1"
+# The event schema major version this script understands, by the event that
+# starts each kind of run: a Teddy session's session_started (see Teddy's
+# docs/events.md), or the quality-check page's quality_check_started. A run
+# that says another major version is skipped.
+SCHEMA_MAJORS = {"session_started": "1", "quality_check_started": "1"}
 
 # Columns that come first, in this order, whether or not a run has them. Every
 # other field follows in the order it was first seen.
@@ -93,7 +95,7 @@ EXTENSIONS = {
 
 # The kind of recording each module makes for its items. A recording of another
 # kind in that module gets its kind in the name too (reels_01_rating).
-MODULE_KINDS = {"sentences": "sentence", "videologs": "videolog", "questions": "questions", "reels": "reel"}
+MODULE_KINDS = {"sentences": "sentence", "videologs": "videolog", "questions": "questions", "reels": "reel", "quality_check": "quality_check"}
 
 
 def media_name(event_id, data):
@@ -173,10 +175,11 @@ def read_events(run_dir, problem):
     ordered = sorted(events.items(), key=lambda e: event_order(e[0]))
 
     for _, data in ordered:
-        if data.get("type") == "session_started":
+        major = SCHEMA_MAJORS.get(data.get("type"))
+        if major is not None:
             schema = str(data.get("schema", ""))
-            if schema.split(".")[0] != SCHEMA_MAJOR:
-                problem(run_dir, f"event schema {schema}, but this script reads {SCHEMA_MAJOR}.x; skipped")
+            if schema.split(".")[0] != major:
+                problem(run_dir, f"{data['type']} says event schema {schema}, but this script reads {major}.x; skipped")
                 return None
             break
     else:
