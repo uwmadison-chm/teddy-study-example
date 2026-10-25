@@ -17,6 +17,7 @@ teddy/            Teddy itself, as a git submodule
 build.sh          builds Teddy with this study into teddy/dist/
 dev.sh            runs Teddy's dev server with this study
 deploy.sh         builds, then copies the build to the web server
+generate-lists.sh writes REDCap randomization lists for this study
 prepare.py        turns organized pig data into CSVs and playable recordings
 ```
 
@@ -45,6 +46,15 @@ The scripts need Node and npm; `deploy.sh` also needs rsync and SSH access to th
 7. When everything works, set `debug: false`.
 
 `./build.sh` checks the study and lists anything wrong with it: a mistyped setting, a missing CSV column, a repeated ID, a reel file that isn't there.
+
+## REDCap randomization lists
+
+```sh
+./generate-lists.sh --out-dir=lists --count=100 --events=base,pw1 \
+    --modules='questions:relaxed,energy|reels:pick(1)|sentences:pick(3)|videologs:01'
+```
+
+This writes `lists/base.csv` and `lists/pw1.csv`, each a REDCap randomization allocation table of 100 `modules` parameters. `pick(N)` chooses N of the module's items for each row, with no repeats within the row; listed IDs are checked against this study's CSVs. `--seed=N` makes the lists the same each time. [Teddy's README](https://github.com/uwmadison-chm/teddy-static#redcap-randomization-lists) has the details.
 
 ## Deploying
 
