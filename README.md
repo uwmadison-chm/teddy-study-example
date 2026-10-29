@@ -41,7 +41,7 @@ The scripts need Node and npm; `deploy.sh` also needs rsync and SSH access to th
 2. Choose a task code for the study, lowercase, and set it as `taskCode` in `config.js` and in the `[task.…]` line of `pig-task.toml`. Task codes are unique across a pig server.
 3. Set `pigServer` and `nextUrlHosts` in `config.js`.
 4. Replace the CSVs and reels in `stimuli/` with the study's own, and list the modules it uses in `modules`. A module left out isn't in the build.
-5. Set the `parameters` and `run_key` in `pig-task.toml` to what the study's links carry, then add the entry to the pig server's configuration and run `pig check` there.
+5. Set the `path_parameters` and `run_key_parameters` in `pig-task.toml` to what the study's links carry, then add the entry to the pig server's configuration and run `pig check` there.
 6. Set the default `TARGET` in `deploy.sh` to the web server and directory.
 7. When everything works, set `debug: false`.
 

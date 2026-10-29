@@ -2,8 +2,8 @@
 # the pig server; the task code has to match taskCode in config.js.
 
 [task.teddy_example]
-parameters = ["participant_id", "session"]
-run_key = ["participant_id", "session"]
+path_parameters = ["participant_id", "session"]
+run_key_parameters = ["participant_id", "session"]
 open = true
 media = true
 # Teddy sends recordings in 5-second parts; at the default bitrates a part is
