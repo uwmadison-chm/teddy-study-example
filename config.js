@@ -8,6 +8,10 @@ export default {
     // While true, nothing is sent to pig; events are logged to the console, and
     // every screen shows a "Debug mode" banner. Set to false for real data.
     debug: true,
+    // This is the behavior if the page reloads (or we revisit for any reason
+    // during a run)
+    // It can be "resume" or "restart" both of which probably make sense
+    revisit: "restart",
     // Hosts the end screen may send participants to with nextURL. Empty means
     // any http or https URL.
     nextUrlHosts: ["redcap.example.edu"],
