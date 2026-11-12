@@ -79,6 +79,10 @@ EVENT_FIELDS = {
     "detector_errors", "text", "responses", "choices", "number", "of", "file",
     "value", "label", "kind", "limit_seconds", "content_type", "reason", "line",
     "lines", "animation", "preloaded", "bytes", "seconds", "rt_ms",
+    "replays", "resume_failed", "module_index", "calibrating", "item_index",
+    "face_check_only", "background_db", "background_speech", "speech_db", "peak_db",
+    "voiced_ms", "sample_rate", "errors", "echo_cancellation", "noise_suppression",
+    "auto_gain_control",
 }
 
 # File extensions for the content types browsers record in. Anything else goes
