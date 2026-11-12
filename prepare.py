@@ -78,7 +78,7 @@ EVENT_FIELDS = {
     "track", "items", "item", "best_score", "centered", "light_ok", "tips_shown",
     "detector_errors", "text", "responses", "choices", "number", "of", "file",
     "value", "label", "kind", "limit_seconds", "content_type", "reason", "line",
-    "lines", "animation",
+    "lines", "animation", "preloaded", "bytes", "seconds", "rt_ms",
 }
 
 # File extensions for the content types browsers record in. Anything else goes
